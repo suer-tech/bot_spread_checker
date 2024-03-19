@@ -284,7 +284,7 @@ async def process_signals(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[1]
     signals_keyboard = InlineKeyboardBuilder()
     signals_keyboard.add(
-        InlineKeyboardButton(text="Сигнал по значению", callback_data="current_value_signal_" + asset_name))
+        InlineKeyboardButton(text="Сигнал по значению", callback_data="valuesignals_" + asset_name))
     signals_keyboard.row()
     signals_keyboard.add(InlineKeyboardButton(text="Сигнал по процентному отклонению",
                                               callback_data="current_percent_signal_" + asset_name))
@@ -297,6 +297,29 @@ async def process_signals(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Сигнал по значению"
+@dp.callback_query(lambda c: c.data.startswith('valuesignals_'))
+async def process_value_signals(callback_query: types.CallbackQuery):
+    global previous_handler
+
+    asset_name = callback_query.data.split('_')[1]
+    signals_keyboard = InlineKeyboardBuilder()
+    signals_keyboard.add(
+        InlineKeyboardButton(text="Текущий сигнал по значению", callback_data="current_value_signal_" + asset_name))
+    signals_keyboard.row()
+    signals_keyboard.add(InlineKeyboardButton(text="Новый сигнал по значению",
+                                              callback_data="new_percent_signal_" + asset_name))
+    signals_keyboard.row()
+    signals_keyboard.add(InlineKeyboardButton(text="Сбросить сигнал по значению",
+                                              callback_data="reset_percent_signal_" + asset_name))
+    signals_keyboard.row()
+    signals_keyboard.add(InlineKeyboardButton(text="<<Назад", callback_data="signals_"))
+    signals_keyboard.adjust(1)
+    previous_handler = signals_keyboard
+    await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
+                                           reply_markup=signals_keyboard.as_markup())
+
+
+# Обработчик нажатия кнопки "Текущий сигнал по значению"
 @dp.callback_query(lambda c: c.data.startswith('current_value_signal_'))
 async def process_current_value_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[3]

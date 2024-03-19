@@ -307,10 +307,10 @@ async def process_value_signals(callback_query: types.CallbackQuery):
         InlineKeyboardButton(text="Текущий сигнал по значению", callback_data="current_value_signal_" + asset_name))
     signals_keyboard.row()
     signals_keyboard.add(InlineKeyboardButton(text="Новый сигнал по значению",
-                                              callback_data="new_percent_signal_" + asset_name))
+                                              callback_data="new_value_signal_" + asset_name))
     signals_keyboard.row()
     signals_keyboard.add(InlineKeyboardButton(text="Сбросить сигнал по значению",
-                                              callback_data="reset_percent_signal_" + asset_name))
+                                              callback_data="reset_value_signal_" + asset_name))
     signals_keyboard.row()
     signals_keyboard.add(InlineKeyboardButton(text="<<Назад", callback_data="signals_"))
     signals_keyboard.adjust(1)
@@ -422,6 +422,29 @@ async def process_cancel_reset_value_signal(callback_query: types.CallbackQuery)
 # ---------------------------------------------------------------------------------------------------------------------
 #                                  Обработчики 'Сигналы по процентам'
 # ---------------------------------------------------------------------------------------------------------------------
+# Обработчик нажатия кнопки "Сигнал по значению"
+@dp.callback_query(lambda c: c.data.startswith('percentsignals_'))
+async def process_percent_signals(callback_query: types.CallbackQuery):
+    global previous_handler
+
+    asset_name = callback_query.data.split('_')[1]
+    signals_keyboard = InlineKeyboardBuilder()
+    signals_keyboard.add(
+        InlineKeyboardButton(text="Текущий сигнал по процентам", callback_data="current_percent_signal_" + asset_name))
+    signals_keyboard.row()
+    signals_keyboard.add(InlineKeyboardButton(text="Новый сигнал по процентам",
+                                              callback_data="new_percent_signal_" + asset_name))
+    signals_keyboard.row()
+    signals_keyboard.add(InlineKeyboardButton(text="Сбросить сигнал по процентам",
+                                              callback_data="reset_percent_signal_" + asset_name))
+    signals_keyboard.row()
+    signals_keyboard.add(InlineKeyboardButton(text="<<Назад", callback_data="signals_"))
+    signals_keyboard.adjust(1)
+    previous_handler = signals_keyboard
+    await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
+                                           reply_markup=signals_keyboard.as_markup())
+
+
 
 # Обработчик нажатия кнопки "Сигнал по процентам"
 @dp.callback_query(lambda c: c.data.startswith('current_percent_signal_'))

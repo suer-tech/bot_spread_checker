@@ -11,7 +11,6 @@ from app.telegram.keyboard.buttons import Button
 from app.telegram.keyboard.keyboard import keyboard_factory
 from app.telegram.states import TextSave
 
-
 # Создание экземпляров бота и диспетчера
 bot = Bot(token="5814873337:AAFmEDxaPRXmg8w1HQ4FTiNB1U5l8pgtFgE")
 dp = Dispatcher()
@@ -60,13 +59,22 @@ async def reset_entry_point(asset_name, query):
 # ---------------------------------------------------------------------------------------------------------------------
 #                                  Основные обработчики
 # ---------------------------------------------------------------------------------------------------------------------
-
 # Обработчик команды /start
 @dp.message(CommandStart())
-async def start(message: types.Message):
-    buttons = [("Актив", "spreads")]
-    keyboard_markup = await keyboard_factory.create(buttons)
-    await message.answer("Выберите действие:", reply_markup=keyboard_markup.as_markup())
+async def check_rp(message: types.Message):
+    static_buttons = await Button().static()
+    static_keyboard = await keyboard_factory.generate_static_keyboard(static_buttons)
+    await message.answer("Привет", reply_markup=static_keyboard.as_markup(resize_keyboard=True))
+
+
+@dp.message()
+async def check_rp(message: types.Message):
+    global previous_handler
+    if message.text == 'Главное меню':
+        main_buttons = await Button().main()
+        keyboard = await keyboard_factory.generate_main_keyboard(main_buttons)
+        previous_handler = keyboard
+        await message.answer("Выберите опцию:", reply_markup=keyboard.as_markup)
 
 
 # Обработчик нажатия кнопки "Актив"
@@ -76,9 +84,9 @@ async def process_assets(callback_query: types.CallbackQuery):
     # Добавление кнопок для каждого актива
     buttons = [(row[0], "asset_" + row[0]) for row in assets]
     # Создаем клавиатуру с активами
-    keyboard_markup = await keyboard_factory.create(buttons)
+    keyboard = await keyboard_factory.create(buttons)
     # Отправляем сообщение с клавиатурой активов и ожидаем ответа
-    await callback_query.message.edit_text("Выберите актив:", reply_markup=keyboard_markup.as_markup())
+    await callback_query.message.edit_text("Выберите актив:", reply_markup=keyboard.as_markup())
 
 
 # Обработчик нажатия кнопки актива
@@ -102,6 +110,16 @@ async def process_spread(callback_query: types.CallbackQuery):
     previous_keyboard = previous_handler
     mess = "Спред для {}: {}".format(asset_name, spread_data[0])
     await callback_query.message.answer(mess, reply_markup=previous_keyboard.as_markup())
+
+
+# Обработчик нажатия кнопки "Спреды"
+@dp.callback_query(lambda c: c.data == 'show_spreads')
+async def process_show_spreads(callback_query: types.CallbackQuery):
+    assets = db.fetchall("SELECT asset_name, spread FROM spreads")
+    mess = str([f'{row[0]}: {row[1]}' for row in assets])
+    previous_keyboard = previous_handler
+    # Отправляем сообщение с клавиатурой активов и ожидаем ответа
+    await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
 
 # ---------------------------------------------------------------------------------------------------------------------
 #                                  Обработчики 'Точки входа'
@@ -347,6 +365,7 @@ async def process_cancel_reset_value_signal(callback_query: types.CallbackQuery)
     asset_name = callback_query.data.split('_')[1]
     # Возвращаемся к выбору опций для актива
     await process_asset(callback_query)
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 #                                  Обработчики 'Сигналы по процентам'

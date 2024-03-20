@@ -22,37 +22,15 @@ previous_handler = None
 # ---------------------------------------------------------------------------------------------------------------------
 #                                  Методы
 # ---------------------------------------------------------------------------------------------------------------------
-
-
-# Функция для создания встроенной клавиатуры
-def create_inline_keyboard():
-    builder = InlineKeyboardBuilder()
-
-    # Добавляем кнопку "Актив"
-    builder.button(text="Актив", callback_data="spreads")
-
-    # Приводим клавиатуру к формату (1 строка, 1 кнопка)
-    builder.adjust(1, 1)
-
-    # Возвращаем собранную клавиатуру
-    return builder.as_markup()
-
-
-# Функция для создания клавиатуры с активами
-async def create_assets_keyboard():
-    builder = InlineKeyboardBuilder()
-
-    # Выполнение запроса к базе данных для получения списка активов
-    cursor.execute("SELECT asset_name FROM spreads")
-    assets = cursor.fetchall()
-
-    # Добавление кнопок для каждого актива
-    for row in assets:
-        builder.button(text=row[0], callback_data="asset_" + row[0])
-
-    builder.adjust(1)
-    # Возвращаем собранную клавиатуру
-    return builder.as_markup()
+async def create_keyboard(buttons, back_data=None):
+    keyboard = InlineKeyboardBuilder()
+    for text, callback_data in buttons:
+        keyboard.add(InlineKeyboardButton(text=text, callback_data=callback_data))
+        keyboard.row()
+    if back_data:
+        keyboard.add(InlineKeyboardButton(text="<<Назад", callback_data=back_data))
+    keyboard.adjust(1)
+    return keyboard
 
 
 async def get_entry_point(asset_name, query):
@@ -103,34 +81,32 @@ async def reset_entry_point(asset_name, query):
 # Обработчик команды /start
 @dp.message(CommandStart())
 async def start(message: types.Message):
-    keyboard_markup = create_inline_keyboard()
-    await message.answer("Выберите действие:", reply_markup=keyboard_markup)
+    buttons = [("Актив", "spreads")]
+    keyboard_markup = await create_keyboard(buttons)
+    await message.answer("Выберите действие:", reply_markup=keyboard_markup.as_markup())
 
 
 # Обработчик нажатия кнопки "Актив"
 @dp.callback_query(lambda c: c.data == 'spreads')
 async def process_assets(callback_query: types.CallbackQuery):
+    cursor.execute("SELECT asset_name FROM spreads")
+    assets = cursor.fetchall()
+
+    # Добавление кнопок для каждого актива
+    buttons = [(row[0], "asset_" + row[0]) for row in assets]
     # Создаем клавиатуру с активами
-    assets_keyboard = await create_assets_keyboard()
+    keyboard_markup = await create_keyboard(buttons)
     # Отправляем сообщение с клавиатурой активов и ожидаем ответа
-    await callback_query.message.edit_text("Выберите актив:", reply_markup=assets_keyboard)
+    await callback_query.message.edit_text("Выберите актив:", reply_markup=keyboard_markup.as_markup())
 
 
 # Обработчик нажатия кнопки актива
 @dp.callback_query(lambda c: c.data.startswith('asset_'))
 async def process_asset(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[1]
-    asset_options_keyboard = InlineKeyboardBuilder()
 
-    # Добавляем кнопки "Спред" и "Точка входа" с callback_data "spread_asset_name" и "entry_point_asset_name"
-    asset_options_keyboard.add(InlineKeyboardButton(text="Спред", callback_data="spread_" + asset_name))
-    asset_options_keyboard.row()  # Создаем новую строку для следующей кнопки
-    asset_options_keyboard.add(InlineKeyboardButton(text="Точка входа", callback_data="entry_point_" + asset_name))
-    asset_options_keyboard.row()  # Создаем новую строку для следующей кнопки
-    asset_options_keyboard.add(InlineKeyboardButton(text="Сигналы", callback_data="signals_" + asset_name))
-    asset_options_keyboard.row()  # Создаем новую строку для следующей кнопки
-    asset_options_keyboard.add(InlineKeyboardButton(text="<<Назад", callback_data="spreads"))
-    asset_options_keyboard.adjust(1)
+    buttons = [("Спред", "spread_" + asset_name), ("Точка входа", "entry_point_" + asset_name), ("Сигналы", "signals_" + asset_name)]
+    asset_options_keyboard = await create_keyboard(buttons, back_data="spreads")
     # Добавьте другие кнопки по желанию
 
     # Отправляем сообщение с клавиатурой опций для актива и ожидаем ответа

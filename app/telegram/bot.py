@@ -415,7 +415,7 @@ async def process_current_percent_signal(callback_query: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data.startswith('new_percent_signal_'))
 async def process_new_percent_signal_(callback_query: types.CallbackQuery, state: FSMContext):
     previous_keyboard = previous_handler
-    asset_name = callback_query.data.split('_')[2]
+    asset_name = callback_query.data.split('_')[3]
     query = "SELECT percent_signal FROM percent_signals WHERE asset_name=%s"
     value_signal = await get_entry_point(asset_name, query)
     if value_signal is not None:

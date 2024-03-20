@@ -1,23 +1,20 @@
 import asyncio
-from aiogram import Bot, Dispatcher, types, Router
+from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton
 import psycopg2
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.telegram.db import db
 from app.telegram.keyboard.buttons import Button
 from app.telegram.keyboard.keyboard import keyboard_factory
 from app.telegram.states import TextSave
 
-# Установка соединения с базой данных PostgreSQL
-conn = psycopg2.connect(dbname='bot', user='postgres', password='password', host='localhost')
-cursor = conn.cursor()
 
 # Создание экземпляров бота и диспетчера
 bot = Bot(token="5814873337:AAFmEDxaPRXmg8w1HQ4FTiNB1U5l8pgtFgE")
 dp = Dispatcher()
-router = Router()
 previous_handler = None
 
 
@@ -28,8 +25,7 @@ async def get_entry_point(asset_name, query):
     entry_point = None
 
     # Выполнение запроса к базе данных для получения списка активов
-    cursor.execute(query, (asset_name,))
-    entry_points = cursor.fetchall()
+    entry_points = db.fetchall(query, (asset_name,))
     if len(entry_points) > 0:
         entry_point = entry_points[0][0]
     return entry_point
@@ -38,9 +34,7 @@ async def get_entry_point(asset_name, query):
 async def save_entry_point(asset_name, new_entry, query):
     try:
         # Выполнение SQL-запроса для вставки новой точки входа в таблицу entry_points
-        cursor.execute(query, (asset_name, new_entry))
-        # Подтверждение изменений в базе данных
-        conn.commit()
+        db.execute(query, *(asset_name, new_entry))
         # Возвращаем True, чтобы указать, что точка входа успешно сохранена
         return True
 
@@ -53,9 +47,7 @@ async def save_entry_point(asset_name, new_entry, query):
 async def reset_entry_point(asset_name, query):
     try:
         # Выполнение SQL-запроса для удаления точки входа из таблицы entry_points
-        cursor.execute(query, (asset_name,))
-        # Подтверждение изменений в базе данных
-        conn.commit()
+        db.execute(query, (asset_name,))
         # Возвращаем True, чтобы указать, что точка входа успешно удалена
         return True
 
@@ -80,9 +72,7 @@ async def start(message: types.Message):
 # Обработчик нажатия кнопки "Актив"
 @dp.callback_query(lambda c: c.data == 'spreads')
 async def process_assets(callback_query: types.CallbackQuery):
-    cursor.execute("SELECT asset_name FROM spreads")
-    assets = cursor.fetchall()
-
+    assets = db.fetchall("SELECT asset_name FROM spreads")
     # Добавление кнопок для каждого актива
     buttons = [(row[0], "asset_" + row[0]) for row in assets]
     # Создаем клавиатуру с активами
@@ -96,7 +86,7 @@ async def process_assets(callback_query: types.CallbackQuery):
 async def process_asset(callback_query: types.CallbackQuery):
     global previous_handler
     asset_name = callback_query.data.split('_')[1]
-    buttons = Button(asset_name).asset()
+    buttons = await Button(asset_name).asset()
     keyboard = await keyboard_factory.create(buttons, back_data="spreads")
     previous_handler = keyboard
     # Отправляем сообщение с клавиатурой опций для актива и ожидаем ответа
@@ -108,24 +98,22 @@ async def process_asset(callback_query: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data.startswith('spread_'))
 async def process_spread(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[1]
-    cursor.execute("SELECT spread FROM spreads WHERE asset_name=%s", (asset_name,))
-    spread_data = cursor.fetchone()
+    spread_data = db.fetchone("SELECT spread FROM spreads WHERE asset_name=%s", (asset_name,))
     previous_keyboard = previous_handler
     mess = "Спред для {}: {}".format(asset_name, spread_data[0])
     await callback_query.message.answer(mess, reply_markup=previous_keyboard.as_markup())
-
 
 # ---------------------------------------------------------------------------------------------------------------------
 #                                  Обработчики 'Точки входа'
 # ---------------------------------------------------------------------------------------------------------------------
 
+
 # Обработчик нажатия кнопки "Точка входа"
 @dp.callback_query(lambda c: c.data.startswith('entry_point_'))
 async def process_entry_point(callback_query: types.CallbackQuery):
     global previous_handler
-
     asset_name = callback_query.data.split('_')[2]
-    buttons = Button(asset_name).entry_point()
+    buttons = await Button(asset_name).entry_point()
     keyboard = await keyboard_factory.create(buttons, back_data="spreads")
     previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для точки входа актива {}: ".format(asset_name),
@@ -242,7 +230,7 @@ async def process_signals(callback_query: types.CallbackQuery):
     global previous_handler
 
     asset_name = callback_query.data.split('_')[1]
-    buttons = Button(asset_name).signals()
+    buttons = await Button(asset_name).signals()
     keyboard = await keyboard_factory.create(buttons, back_data="spreads")
     previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
@@ -253,9 +241,8 @@ async def process_signals(callback_query: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data.startswith('valuesignals_'))
 async def process_value_signals(callback_query: types.CallbackQuery):
     global previous_handler
-
     asset_name = callback_query.data.split('_')[1]
-    buttons = Button(asset_name).value_signals()
+    buttons = await Button(asset_name).value_signals()
     keyboard = await keyboard_factory.create(buttons, back_data="signals_")
     previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
@@ -370,7 +357,7 @@ async def process_percent_signals(callback_query: types.CallbackQuery):
     global previous_handler
 
     asset_name = callback_query.data.split('_')[1]
-    buttons = Button(asset_name).percent_signals()
+    buttons = await Button(asset_name).percent_signals()
     keyboard = await keyboard_factory.create(buttons, back_data="signals_")
     previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),

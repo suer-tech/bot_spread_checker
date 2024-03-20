@@ -133,19 +133,14 @@ async def process_entry_point(callback_query: types.CallbackQuery):
     global previous_handler
 
     asset_name = callback_query.data.split('_')[2]
-    entry_point_keyboard = InlineKeyboardBuilder()
-    entry_point_keyboard.add(InlineKeyboardButton(text="Текущая ТВХ", callback_data="current_entry_" + asset_name))
-    entry_point_keyboard.row()
-    entry_point_keyboard.add(InlineKeyboardButton(text="Новая ТВХ", callback_data="new_entry_" + asset_name))
-    entry_point_keyboard.row()
-    entry_point_keyboard.add(InlineKeyboardButton(text="Сбросить ТВХ", callback_data="reset_entry_" + asset_name))
-    entry_point_keyboard.row()
+    buttons = [("Текущая ТВХ", "current_entry_" + asset_name),
+               ("Новая ТВХ", "new_entry_" + asset_name),
+               ("Сбросить ТВХ", "reset_entry_" + asset_name)]
+    keyboard = await create_keyboard(buttons, back_data="spreads")
 
-    entry_point_keyboard.add(InlineKeyboardButton(text="<<Назад", callback_data="spreads"))
-    entry_point_keyboard.adjust(1)
-    previous_handler = entry_point_keyboard
+    previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для точки входа актива {}: ".format(asset_name),
-                                           reply_markup=entry_point_keyboard.as_markup())
+                                           reply_markup=keyboard.as_markup())
 
 
 # Обработчик нажатия кнопки "Текущая ТВХ"
@@ -258,18 +253,13 @@ async def process_signals(callback_query: types.CallbackQuery):
     global previous_handler
 
     asset_name = callback_query.data.split('_')[1]
-    signals_keyboard = InlineKeyboardBuilder()
-    signals_keyboard.add(
-        InlineKeyboardButton(text="Сигнал по значению", callback_data="valuesignals_" + asset_name))
-    signals_keyboard.row()
-    signals_keyboard.add(InlineKeyboardButton(text="Сигнал по процентному отклонению",
-                                              callback_data="current_percent_signal_" + asset_name))
-    signals_keyboard.row()
-    signals_keyboard.add(InlineKeyboardButton(text="<<Назад", callback_data="spreads"))
-    signals_keyboard.adjust(1)
-    previous_handler = signals_keyboard
+    buttons = [("Сигнал по значению", "valuesignals_" + asset_name),
+               ("Сигнал по процентному отклонению", "current_percent_signal_" + asset_name)]
+    keyboard = await create_keyboard(buttons, back_data="spreads")
+
+    previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
-                                           reply_markup=signals_keyboard.as_markup())
+                                           reply_markup=keyboard.as_markup())
 
 
 # Обработчик нажатия кнопки "Сигнал по значению"
@@ -278,21 +268,14 @@ async def process_value_signals(callback_query: types.CallbackQuery):
     global previous_handler
 
     asset_name = callback_query.data.split('_')[1]
-    signals_keyboard = InlineKeyboardBuilder()
-    signals_keyboard.add(
-        InlineKeyboardButton(text="Текущий сигнал по значению", callback_data="current_value_signal_" + asset_name))
-    signals_keyboard.row()
-    signals_keyboard.add(InlineKeyboardButton(text="Новый сигнал по значению",
-                                              callback_data="new_value_signal_" + asset_name))
-    signals_keyboard.row()
-    signals_keyboard.add(InlineKeyboardButton(text="Сбросить сигнал по значению",
-                                              callback_data="reset_value_signal_" + asset_name))
-    signals_keyboard.row()
-    signals_keyboard.add(InlineKeyboardButton(text="<<Назад", callback_data="signals_"))
-    signals_keyboard.adjust(1)
-    previous_handler = signals_keyboard
+    buttons = [("Текущий сигнал по значению", "current_value_signal_" + asset_name),
+               ("Новый сигнал по значению", "new_value_signal_" + asset_name),
+               ("Сбросить сигнал по значению", "reset_value_signal_" + asset_name)]
+    keyboard = await create_keyboard(buttons, back_data="signals_")
+
+    previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
-                                           reply_markup=signals_keyboard.as_markup())
+                                           reply_markup=keyboard.as_markup())
 
 
 # Обработчик нажатия кнопки "Текущий сигнал по значению"
@@ -394,7 +377,6 @@ async def process_cancel_reset_value_signal(callback_query: types.CallbackQuery)
     # Возвращаемся к выбору опций для актива
     await process_asset(callback_query)
 
-
 # ---------------------------------------------------------------------------------------------------------------------
 #                                  Обработчики 'Сигналы по процентам'
 # ---------------------------------------------------------------------------------------------------------------------
@@ -404,22 +386,14 @@ async def process_percent_signals(callback_query: types.CallbackQuery):
     global previous_handler
 
     asset_name = callback_query.data.split('_')[1]
-    signals_keyboard = InlineKeyboardBuilder()
-    signals_keyboard.add(
-        InlineKeyboardButton(text="Текущий сигнал по процентам", callback_data="current_percent_signal_" + asset_name))
-    signals_keyboard.row()
-    signals_keyboard.add(InlineKeyboardButton(text="Новый сигнал по процентам",
-                                              callback_data="new_percent_signal_" + asset_name))
-    signals_keyboard.row()
-    signals_keyboard.add(InlineKeyboardButton(text="Сбросить сигнал по процентам",
-                                              callback_data="reset_percent_signal_" + asset_name))
-    signals_keyboard.row()
-    signals_keyboard.add(InlineKeyboardButton(text="<<Назад", callback_data="signals_"))
-    signals_keyboard.adjust(1)
-    previous_handler = signals_keyboard
-    await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
-                                           reply_markup=signals_keyboard.as_markup())
+    buttons = [("Текущий сигнал по процентам", "current_percent_signal_" + asset_name),
+               ("Новый сигнал по процентам", "new_percent_signal_" + asset_name),
+               ("Сбросить сигнал по процентам", "reset_percent_signal_" + asset_name)]
+    keyboard = await create_keyboard(buttons, back_data="signals_")
 
+    previous_handler = keyboard
+    await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
+                                           reply_markup=keyboard.as_markup())
 
 
 # Обработчик нажатия кнопки "Сигнал по процентам"

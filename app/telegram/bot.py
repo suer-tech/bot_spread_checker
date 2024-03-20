@@ -6,6 +6,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 import psycopg2
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.telegram.keyboard_buttons import Button
 from app.telegram.states import TextSave
 
 # Установка соединения с базой данных PostgreSQL
@@ -103,15 +104,14 @@ async def process_assets(callback_query: types.CallbackQuery):
 # Обработчик нажатия кнопки актива
 @dp.callback_query(lambda c: c.data.startswith('asset_'))
 async def process_asset(callback_query: types.CallbackQuery):
+    global previous_handler
     asset_name = callback_query.data.split('_')[1]
-
-    buttons = [("Спред", "spread_" + asset_name), ("Точка входа", "entry_point_" + asset_name), ("Сигналы", "signals_" + asset_name)]
-    asset_options_keyboard = await create_keyboard(buttons, back_data="spreads")
-    # Добавьте другие кнопки по желанию
-
+    buttons = Button(asset_name).asset()
+    keyboard = await create_keyboard(buttons, back_data="spreads")
+    previous_handler = keyboard
     # Отправляем сообщение с клавиатурой опций для актива и ожидаем ответа
     mess = "Выберите опцию для актива {}: ".format(asset_name)
-    await callback_query.message.edit_text(mess, reply_markup=asset_options_keyboard.as_markup())
+    await callback_query.message.edit_text(mess, reply_markup=keyboard.as_markup())
 
 
 # Обработчик нажатия кнопки "Спред"
@@ -120,7 +120,9 @@ async def process_spread(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[1]
     cursor.execute("SELECT spread FROM spreads WHERE asset_name=%s", (asset_name,))
     spread_data = cursor.fetchone()
-    await callback_query.message.answer("Спред для {}: {}".format(asset_name, spread_data[0]))
+    previous_keyboard = previous_handler
+    mess = "Спред для {}: {}".format(asset_name, spread_data[0])
+    await callback_query.message.answer(mess, reply_markup=previous_keyboard.as_markup())
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -133,11 +135,8 @@ async def process_entry_point(callback_query: types.CallbackQuery):
     global previous_handler
 
     asset_name = callback_query.data.split('_')[2]
-    buttons = [("Текущая ТВХ", "current_entry_" + asset_name),
-               ("Новая ТВХ", "new_entry_" + asset_name),
-               ("Сбросить ТВХ", "reset_entry_" + asset_name)]
+    buttons = Button(asset_name).entry_point()
     keyboard = await create_keyboard(buttons, back_data="spreads")
-
     previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для точки входа актива {}: ".format(asset_name),
                                            reply_markup=keyboard.as_markup())
@@ -253,10 +252,8 @@ async def process_signals(callback_query: types.CallbackQuery):
     global previous_handler
 
     asset_name = callback_query.data.split('_')[1]
-    buttons = [("Сигнал по значению", "valuesignals_" + asset_name),
-               ("Сигнал по процентному отклонению", "current_percent_signal_" + asset_name)]
+    buttons = Button(asset_name).signals()
     keyboard = await create_keyboard(buttons, back_data="spreads")
-
     previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
                                            reply_markup=keyboard.as_markup())
@@ -268,11 +265,8 @@ async def process_value_signals(callback_query: types.CallbackQuery):
     global previous_handler
 
     asset_name = callback_query.data.split('_')[1]
-    buttons = [("Текущий сигнал по значению", "current_value_signal_" + asset_name),
-               ("Новый сигнал по значению", "new_value_signal_" + asset_name),
-               ("Сбросить сигнал по значению", "reset_value_signal_" + asset_name)]
+    buttons = Button(asset_name).value_signals()
     keyboard = await create_keyboard(buttons, back_data="signals_")
-
     previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
                                            reply_markup=keyboard.as_markup())
@@ -297,7 +291,7 @@ async def process_current_value_signal(callback_query: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data.startswith('new_value_signal_'))
 async def process_new_value_signal(callback_query: types.CallbackQuery, state: FSMContext):
     previous_keyboard = previous_handler
-    asset_name = callback_query.data.split('_')[2]
+    asset_name = callback_query.data.split('_')[3]
     query = "SELECT value_signal FROM value_signals WHERE asset_name=%s"
     value_signal = await get_entry_point(asset_name, query)
     if value_signal is not None:
@@ -386,11 +380,8 @@ async def process_percent_signals(callback_query: types.CallbackQuery):
     global previous_handler
 
     asset_name = callback_query.data.split('_')[1]
-    buttons = [("Текущий сигнал по процентам", "current_percent_signal_" + asset_name),
-               ("Новый сигнал по процентам", "new_percent_signal_" + asset_name),
-               ("Сбросить сигнал по процентам", "reset_percent_signal_" + asset_name)]
+    buttons = Button(asset_name).percent_signals()
     keyboard = await create_keyboard(buttons, back_data="signals_")
-
     previous_handler = keyboard
     await callback_query.message.edit_text("Выберите действие для сигнала актива {}: ".format(asset_name),
                                            reply_markup=keyboard.as_markup())

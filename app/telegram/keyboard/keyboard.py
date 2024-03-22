@@ -20,6 +20,7 @@ class KeyboardFactory:
         keyboard = InlineKeyboardBuilder()
         for text, callback_data in buttons:
             keyboard.add(InlineKeyboardButton(text=text, callback_data=callback_data))
+            keyboard.row()
         keyboard.adjust(1)
         return keyboard
 

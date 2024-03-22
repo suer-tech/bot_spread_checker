@@ -7,7 +7,7 @@ import psycopg2
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.telegram.db import db
-from app.telegram.keyboard.buttons import Button
+from app.telegram.keyboard.buttons import Button, main
 from app.telegram.keyboard.keyboard import keyboard_factory
 from app.telegram.states import TextSave
 
@@ -61,20 +61,21 @@ async def reset_entry_point(asset_name, query):
 # ---------------------------------------------------------------------------------------------------------------------
 # Обработчик команды /start
 @dp.message(CommandStart())
-async def check_rp(message: types.Message):
+async def start(message: types.Message):
     static_buttons = await Button().static()
     static_keyboard = await keyboard_factory.generate_static_keyboard(static_buttons)
     await message.answer("Привет", reply_markup=static_keyboard.as_markup(resize_keyboard=True))
 
 
 @dp.message()
-async def check_rp(message: types.Message):
+async def check_rpm(message: types.Message):
     global previous_handler
     if message.text == 'Главное меню':
-        main_buttons = await Button().main()
+        main_buttons = await main()
         keyboard = await keyboard_factory.generate_main_keyboard(main_buttons)
         previous_handler = keyboard
-        await message.answer("Выберите опцию:", reply_markup=keyboard.as_markup)
+        await message.answer("Выберите опцию:", reply_markup=keyboard.as_markup())
+
 
 
 # Обработчик нажатия кнопки "Актив"

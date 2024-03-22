@@ -1,3 +1,13 @@
+async def main():
+    return [
+        ("Активы", "spreads"),
+        ("Спреды", "show_spreads"),
+        ("Точки входа", "entry_points"),
+        ("Сигналы по значению", "value_signals"),
+        ("Сигналы по процентам", "percent_signals")
+    ]
+
+
 class Button:
     def __init__(self, asset_name=None):
         self.asset_name = asset_name
@@ -5,16 +15,6 @@ class Button:
     async def static(self):
         return [
             "Главное меню",
-            "Перезагрузка",
-        ]
-
-    async def main(self):
-        return [
-            ("Активы", "spreads"),
-            ("Спреды", "show_spreads"),
-            ("Точки входа", "entry_points"),
-            ("Сигналы по значению", "value_signals"),
-            ("Сигналы по процентам", "percent_signals")
         ]
 
     async def asset(self):

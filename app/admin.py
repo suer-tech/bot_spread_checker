@@ -1,3 +1,12 @@
 from django.contrib import admin
 
-# Register your models here.
+from .forms import InstrumentForm
+from .models import Instrument
+
+
+class InstrumentAdmin(admin.ModelAdmin):
+    form = InstrumentForm
+
+
+admin.site.register(Instrument, InstrumentAdmin)
+

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Удалить инструмент</title>
+</head>
+<body>
+    <h2>Удалить инструмент</h2>
+    <p>Вы уверены, что хотите удалить инструмент "{{ instrument.name }}"?</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit">Удалить</button>
+    </form>
+</body>
+</html>

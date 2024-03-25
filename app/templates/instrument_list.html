@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Список инструментов</title>
+</head>
+<body>
+    <h2>Список инструментов</h2>
+    <ul>
+        {% for instrument in instruments %}
+            <li>{{ instrument.name }} - Базовый актив: {{ instrument.base }}, Фьючерс: {{ instrument.future }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

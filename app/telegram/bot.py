@@ -12,7 +12,7 @@ from app.telegram.keyboard.keyboard import keyboard_factory
 from app.telegram.states import TextSave
 
 # Создание экземпляров бота и диспетчера
-bot = Bot(token="5814873337:AAFmEDxaPRXmg8w1HQ4FTiNB1U5l8pgtFgE")
+bot = Bot(token="6673857772:AAH4ZFcC9PFGSPs7o447QP_UQJNUiLjaVLw")
 dp = Dispatcher()
 previous_handler = None
 
@@ -117,10 +117,53 @@ async def process_spread(callback_query: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data == 'show_spreads')
 async def process_show_spreads(callback_query: types.CallbackQuery):
     assets = db.fetchall("SELECT asset_name, spread FROM spreads")
-    mess = str([f'{row[0]}: {row[1]}' for row in assets])
+    if assets:
+        mess = '\n'.join([f'{row[0]}: {row[1]}' for row in assets])
+    else:
+        mess = "Спреды отсутствуют"
     previous_keyboard = previous_handler
     # Отправляем сообщение с клавиатурой активов и ожидаем ответа
     await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
+
+
+# Обработчик нажатия кнопки "Точки входа"
+@dp.callback_query(lambda c: c.data == 'entry_points')
+async def process_show_entry_points(callback_query: types.CallbackQuery):
+    assets = db.fetchall("SELECT asset_name, entry_point FROM entry_points")
+    if assets:
+        mess = '\n'.join([f'{row[0]}: {row[1]}' for row in assets])
+    else:
+        mess = "Точки входа отсутствуют"
+    previous_keyboard = previous_handler
+    # Отправляем сообщение с клавиатурой активов и ожидаем ответа
+    await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
+
+
+# Обработчик нажатия кнопки "Сигналы по значению"
+@dp.callback_query(lambda c: c.data == 'value_signals')
+async def process_show_value_signals(callback_query: types.CallbackQuery):
+    assets = db.fetchall("SELECT asset_name, value_signal FROM value_signals")
+    if assets:
+        mess = '\n'.join([f'{row[0]}: {row[1]}' for row in assets])
+    else:
+        mess = "Сигналы по значению отсутствуют"
+    previous_keyboard = previous_handler
+    # Отправляем сообщение с клавиатурой активов и ожидаем ответа
+    await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
+
+
+# Обработчик нажатия кнопки "Сигналы по процентам"
+@dp.callback_query(lambda c: c.data == 'percent_signals')
+async def process_show_percent_signals(callback_query: types.CallbackQuery):
+    assets = db.fetchall("SELECT asset_name, percent_signal FROM percent_signals")
+    if assets:
+        mess = '\n'.join([f'{row[0]}: {row[1]}' for row in assets])
+    else:
+        mess = "Сигналы по процентам отсутствуют"
+    previous_keyboard = previous_handler
+    # Отправляем сообщение с клавиатурой активов и ожидаем ответа
+    await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 #                                  Обработчики 'Точки входа'

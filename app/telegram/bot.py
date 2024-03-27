@@ -11,6 +11,7 @@ from app.telegram.keyboard.buttons import Button, main
 from app.telegram.keyboard.keyboard import keyboard_factory
 from app.telegram.states import TextSave
 
+
 # Создание экземпляров бота и диспетчера
 bot = Bot(token="6673857772:AAH4ZFcC9PFGSPs7o447QP_UQJNUiLjaVLw")
 dp = Dispatcher()
@@ -75,7 +76,6 @@ async def check_rpm(message: types.Message):
         keyboard = await keyboard_factory.generate_main_keyboard(main_buttons)
         previous_handler = keyboard
         await message.answer("Выберите опцию:", reply_markup=keyboard.as_markup())
-
 
 
 # Обработчик нажатия кнопки "Актив"

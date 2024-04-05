@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from pathlib import Path
 
+from django.db.backends.postgresql.psycopg_any import IsolationLevel
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -82,7 +84,12 @@ DATABASES = {
         'USER': 'postgres',
         'PASSWORD': 'password',
         'HOST': 'localhost',
-        'PORT': '',
+        'PORT': '5432',
+        'OPTIONS': {
+            'isolation_level': IsolationLevel.READ_COMMITTED,
+        },
+        'ATOMIC_REQUESTS': True,
+        'CONN_MAX_AGE': 0,
     }
 }
 

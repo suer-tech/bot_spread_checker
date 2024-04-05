@@ -1,6 +1,9 @@
+from asgiref.sync import sync_to_async
 from django import forms
 from django.contrib.admin.widgets import AdminTextInputWidget
 from .models import Instrument
+from .services.repositories.spread_repositories import SpreadRepository
+from .services.services import calculate_spread
 from .views import get_base_price, get_future_price
 
 
@@ -23,14 +26,16 @@ class InstrumentForm(forms.ModelForm):
         instrument = super().save(commit=False)
 
         # Получение цены базового актива и фьючерса из введенных пользователем данных
-        name = self.fields['name']
         base_price = get_base_price(self.cleaned_data['base'])
         future_price = get_future_price(self.cleaned_data['future'])
 
         # Сохранение цен в базу данных
-        instrument.name = name
+        instrument.name = self.cleaned_data['name']
         instrument.base = base_price
         instrument.future = future_price
+
+        spread = calculate_spread(instrument)
+        SpreadRepository.add_spread(instrument.name, spread)
 
         if commit:
             instrument.save()

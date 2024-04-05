@@ -5,7 +5,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton
 import psycopg2
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from asgiref.sync import sync_to_async
 
+from app.services.repositories.entry_point_repositories import EntriesPointRepository
+from app.services.repositories.percent_signal_repositories import PercentSignalRepository
+from app.services.repositories.spread_repositories import SpreadRepository
+from app.services.repositories.value_signal_repositories import ValueSignalRepository
 from app.telegram.db import db
 from app.telegram.keyboard.buttons import Button, main
 from app.telegram.keyboard.keyboard import keyboard_factory
@@ -16,45 +21,6 @@ from app.telegram.states import TextSave
 bot = Bot(token="6673857772:AAH4ZFcC9PFGSPs7o447QP_UQJNUiLjaVLw")
 dp = Dispatcher()
 previous_handler = None
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-#                                  Методы
-# ---------------------------------------------------------------------------------------------------------------------
-async def get_entry_point(asset_name, query):
-    entry_point = None
-
-    # Выполнение запроса к базе данных для получения списка активов
-    entry_points = db.fetchall(query, (asset_name,))
-    if len(entry_points) > 0:
-        entry_point = entry_points[0][0]
-    return entry_point
-
-
-async def save_entry_point(asset_name, new_entry, query):
-    try:
-        # Выполнение SQL-запроса для вставки новой точки входа в таблицу entry_points
-        db.execute(query, *(asset_name, new_entry))
-        # Возвращаем True, чтобы указать, что точка входа успешно сохранена
-        return True
-
-    except (Exception, psycopg2.Error) as error:
-        # В случае ошибки выводим сообщение об ошибке и возвращаем False
-        print("Ошибка при сохранении:", error)
-        return False
-
-
-async def reset_entry_point(asset_name, query):
-    try:
-        # Выполнение SQL-запроса для удаления точки входа из таблицы entry_points
-        db.execute(query, (asset_name,))
-        # Возвращаем True, чтобы указать, что точка входа успешно удалена
-        return True
-
-    except (Exception, psycopg2.Error) as error:
-        # В случае ошибки выводим сообщение об ошибке и возвращаем False
-        print("Ошибка при сбросе:", error)
-        return False
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -81,13 +47,17 @@ async def check_rpm(message: types.Message):
 # Обработчик нажатия кнопки "Актив"
 @dp.callback_query(lambda c: c.data == 'spreads')
 async def process_assets(callback_query: types.CallbackQuery):
-    assets = db.fetchall("SELECT asset_name FROM spreads")
+    assets = await SpreadRepository.get_all_spreads()
+    if len(assets) == 0:
+        mess = "Сохраненные активы отсутствуют"
+    else:
+        mess = "Выберите актив:"
     # Добавление кнопок для каждого актива
     buttons = [(row[0], "asset_" + row[0]) for row in assets]
     # Создаем клавиатуру с активами
     keyboard = await keyboard_factory.create(buttons)
     # Отправляем сообщение с клавиатурой активов и ожидаем ответа
-    await callback_query.message.edit_text("Выберите актив:", reply_markup=keyboard.as_markup())
+    await callback_query.message.edit_text(mess, reply_markup=keyboard.as_markup())
 
 
 # Обработчик нажатия кнопки актива
@@ -107,7 +77,7 @@ async def process_asset(callback_query: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data.startswith('spread_'))
 async def process_spread(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[1]
-    spread_data = db.fetchone("SELECT spread FROM spreads WHERE asset_name=%s", (asset_name,))
+    spread_data = await SpreadRepository.get_spread_by_asset_name(asset_name)
     previous_keyboard = previous_handler
     mess = "Спред для {}: {}".format(asset_name, spread_data[0])
     await callback_query.message.answer(mess, reply_markup=previous_keyboard.as_markup())
@@ -116,7 +86,7 @@ async def process_spread(callback_query: types.CallbackQuery):
 # Обработчик нажатия кнопки "Спреды"
 @dp.callback_query(lambda c: c.data == 'show_spreads')
 async def process_show_spreads(callback_query: types.CallbackQuery):
-    assets = db.fetchall("SELECT asset_name, spread FROM spreads")
+    assets = await SpreadRepository.get_all_spreads()
     if assets:
         mess = '\n'.join([f'{row[0]}: {row[1]}' for row in assets])
     else:
@@ -129,7 +99,7 @@ async def process_show_spreads(callback_query: types.CallbackQuery):
 # Обработчик нажатия кнопки "Точки входа"
 @dp.callback_query(lambda c: c.data == 'entry_points')
 async def process_show_entry_points(callback_query: types.CallbackQuery):
-    assets = db.fetchall("SELECT asset_name, entry_point FROM entry_points")
+    assets = await EntriesPointRepository.get_all_entries_points()
     if assets:
         mess = '\n'.join([f'{row[0]}: {row[1]}' for row in assets])
     else:
@@ -142,7 +112,7 @@ async def process_show_entry_points(callback_query: types.CallbackQuery):
 # Обработчик нажатия кнопки "Сигналы по значению"
 @dp.callback_query(lambda c: c.data == 'value_signals')
 async def process_show_value_signals(callback_query: types.CallbackQuery):
-    assets = db.fetchall("SELECT asset_name, value_signal FROM value_signals")
+    assets = await ValueSignalRepository.get_all_value_signals()
     if assets:
         mess = '\n'.join([f'{row[0]}: {row[1]}' for row in assets])
     else:
@@ -155,7 +125,7 @@ async def process_show_value_signals(callback_query: types.CallbackQuery):
 # Обработчик нажатия кнопки "Сигналы по процентам"
 @dp.callback_query(lambda c: c.data == 'percent_signals')
 async def process_show_percent_signals(callback_query: types.CallbackQuery):
-    assets = db.fetchall("SELECT asset_name, percent_signal FROM percent_signals")
+    assets = await PercentSignalRepository.get_all_percent_signals()
     if assets:
         mess = '\n'.join([f'{row[0]}: {row[1]}' for row in assets])
     else:
@@ -186,8 +156,7 @@ async def process_entry_point(callback_query: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data.startswith('current_entry_'))
 async def process_current_entry(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[2]
-    query = "SELECT entry_point FROM entry_points WHERE asset_name=%s"
-    entry_point = await get_entry_point(asset_name, query)
+    entry_point = await EntriesPointRepository.get_entries_point_by_asset_name(asset_name)
     previous_keyboard = previous_handler
     if entry_point is not None:
         await callback_query.message.edit_text(f"Текущая ТВХ для актива {asset_name}: {entry_point}",
@@ -202,8 +171,7 @@ async def process_current_entry(callback_query: types.CallbackQuery):
 async def process_new_entry(callback_query: types.CallbackQuery, state: FSMContext):
     previous_keyboard = previous_handler
     asset_name = callback_query.data.split('_')[2]
-    query = "SELECT entry_point FROM entry_points WHERE asset_name=%s"
-    entry_point = await get_entry_point(asset_name, query)
+    entry_point = await EntriesPointRepository.get_entries_point_by_asset_name(asset_name)
     if entry_point is not None:
         mess = f"Для актива {asset_name} уже существует точка входа."
         await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
@@ -225,8 +193,7 @@ async def process_new_entry_text(message: types.Message, state: FSMContext):
         data = await state.get_data()
         asset_name = data.get('asset_name')
         # Сохраняем новую ТВХ в базу данных
-        query = "INSERT INTO entry_points (asset_name, entry_point) VALUES (%s, %s)"
-        await save_entry_point(asset_name, new_entry, query)
+        query = EntriesPointRepository.add_entries_point(asset_name, new_entry)
         # Выводим сообщение об успешном сохранении новой точки входа
         mess = f"Новая ТВХ для актива {asset_name} успешно сохранена: {new_entry}"
         await message.answer(mess, reply_markup=previous_keyboard.as_markup())
@@ -240,8 +207,7 @@ async def process_new_entry_text(message: types.Message, state: FSMContext):
 @dp.callback_query(lambda c: c.data.startswith('reset_entry_'))
 async def process_reset_entry(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[2]
-    query = "SELECT entry_point FROM entry_points WHERE asset_name=%s"
-    entry_point = await get_entry_point(asset_name, query)
+    entry_point = await EntriesPointRepository.get_entries_point_by_asset_name(asset_name)
     previous_keyboard = previous_handler
     if entry_point is not None:
         # Создаем клавиатуру с кнопками "Да" и "Нет"
@@ -263,8 +229,7 @@ async def process_confirm_reset(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[2]
     previous_keyboard = previous_handler
     # Выполняем сброс точки входа
-    query = "DELETE FROM entry_points WHERE asset_name = %s"
-    reset = await reset_entry_point(asset_name, query)
+    reset = EntriesPointRepository.delete_entries_point(asset_name)
     if reset:
         # Отправляем сообщение об успешном сбросе точки входа
         mess = f"ТВХ для актива {asset_name} успешно сброшена."
@@ -315,8 +280,7 @@ async def process_value_signals(callback_query: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data.startswith('current_value_signal_'))
 async def process_current_value_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[3]
-    query = "SELECT value_signal FROM value_signals WHERE asset_name=%s"
-    current_value_signal = await get_entry_point(asset_name, query)
+    current_value_signal = await ValueSignalRepository.get_value_signal_by_asset_name(asset_name)
     previous_keyboard = previous_handler
     if current_value_signal is not None:
         await callback_query.message.edit_text(f"Сигнал по значению для актива {asset_name}: {current_value_signal}",
@@ -331,9 +295,8 @@ async def process_current_value_signal(callback_query: types.CallbackQuery):
 async def process_new_value_signal(callback_query: types.CallbackQuery, state: FSMContext):
     previous_keyboard = previous_handler
     asset_name = callback_query.data.split('_')[3]
-    query = "SELECT value_signal FROM value_signals WHERE asset_name=%s"
-    value_signal = await get_entry_point(asset_name, query)
-    if value_signal is not None:
+    current_value_signal = await ValueSignalRepository.get_value_signal_by_asset_name(asset_name)
+    if current_value_signal is not None:
         mess = f"Для актива {asset_name} уже существует сигнал по значению."
         await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
         return
@@ -348,15 +311,10 @@ async def process_new_value_signal(callback_query: types.CallbackQuery, state: F
 async def process_new_value_signal_text(message: types.Message, state: FSMContext):
     previous_keyboard = previous_handler
     try:
-        # Получаем введенное значение
         new_value_signal = float(message.text)
-        # Получаем информацию о текущем активе из состояния
         data = await state.get_data()
         asset_name = data.get('asset_name')
-        # Сохраняем новую ТВХ в базу данных
-        query = "INSERT INTO value_signals (asset_name, value_signal) VALUES (%s, %s)"
-        await save_entry_point(asset_name, new_value_signal, query)
-        # Выводим сообщение об успешном сохранении новой точки входа
+        save_new_entry_point = await ValueSignalRepository.add_value_signal(asset_name, new_value_signal)
         mess = f"Новый сигнал по значению для актива {asset_name} успешно сохранен: {new_value_signal}"
         await message.answer(mess, reply_markup=previous_keyboard.as_markup())
         # Очищаем состояние
@@ -369,10 +327,9 @@ async def process_new_value_signal_text(message: types.Message, state: FSMContex
 @dp.callback_query(lambda c: c.data.startswith('reset_value_signal_'))
 async def process_reset_value_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[3]
-    query = "SELECT value_signal FROM value_signals WHERE asset_name=%s"
-    value_signal = await get_entry_point(asset_name, query)
+    current_value_signal = await ValueSignalRepository.get_value_signal_by_asset_name(asset_name)
     previous_keyboard = previous_handler
-    if value_signal is not None:
+    if current_value_signal is not None:
         # Создаем клавиатуру с кнопками "Да" и "Нет"
         confirm_keyboard = InlineKeyboardBuilder()
         confirm_keyboard.add(InlineKeyboardButton(text="Да", callback_data=f"confirm_value_signal_reset_{asset_name}"))
@@ -391,9 +348,7 @@ async def process_reset_value_signal(callback_query: types.CallbackQuery):
 async def process_confirm_reset_value_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[4]
     previous_keyboard = previous_handler
-    # Выполняем сброс точки входа
-    query = "DELETE FROM value_signals WHERE asset_name = %s"
-    reset = await reset_entry_point(asset_name, query)
+    reset = await ValueSignalRepository.delete_value_signal(asset_name)
     if reset:
         # Отправляем сообщение об успешном сбросе точки входа
         mess = f"Сигнал по значению для актива {asset_name} успешно сброшена."
@@ -431,11 +386,10 @@ async def process_percent_signals(callback_query: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data.startswith('current_percent_signal_'))
 async def process_current_percent_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[3]
-    query = "SELECT percent_signal FROM percent_signals WHERE asset_name=%s"
-    current_value_signal = await get_entry_point(asset_name, query)
+    current_percent_signal = await PercentSignalRepository.get_percent_signal_by_asset_name(asset_name)
     previous_keyboard = previous_handler
-    if current_value_signal is not None:
-        await callback_query.message.edit_text(f"Сигнал по процентам для актива {asset_name}: {current_value_signal}",
+    if current_percent_signal is not None:
+        await callback_query.message.edit_text(f"Сигнал по процентам для актива {asset_name}: {current_percent_signal}",
                                                reply_markup=previous_keyboard.as_markup())
     else:
         await callback_query.message.edit_text(f"Для актива {asset_name} нет сохраненного сигнала по процентам.",
@@ -447,9 +401,8 @@ async def process_current_percent_signal(callback_query: types.CallbackQuery):
 async def process_new_percent_signal_(callback_query: types.CallbackQuery, state: FSMContext):
     previous_keyboard = previous_handler
     asset_name = callback_query.data.split('_')[3]
-    query = "SELECT percent_signal FROM percent_signals WHERE asset_name=%s"
-    value_signal = await get_entry_point(asset_name, query)
-    if value_signal is not None:
+    current_percent_signal = await PercentSignalRepository.get_percent_signal_by_asset_name(asset_name)
+    if current_percent_signal is not None:
         mess = f"Для актива {asset_name} уже существует сигнал по процентам."
         await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
         return
@@ -465,15 +418,12 @@ async def process_new_percent_signal_text(message: types.Message, state: FSMCont
     previous_keyboard = previous_handler
     try:
         # Получаем введенное значение
-        new_value_signal = float(message.text)
-        # Получаем информацию о текущем активе из состояния
+        new_percent_signal = float(message.text)
         data = await state.get_data()
         asset_name = data.get('asset_name')
-        # Сохраняем новую ТВХ в базу данных
-        query = "INSERT INTO percent_signals (asset_name, percent_signal) VALUES (%s, %s)"
-        await save_entry_point(asset_name, new_value_signal, query)
+        new_percent_signal = await PercentSignalRepository.add_percent_signal(asset_name, new_percent_signal)
         # Выводим сообщение об успешном сохранении новой точки входа
-        mess = f"Новый сигнал по процентам для актива {asset_name} успешно сохранен: {new_value_signal}"
+        mess = f"Новый сигнал по процентам для актива {asset_name} успешно сохранен: {new_percent_signal}"
         await message.answer(mess, reply_markup=previous_keyboard.as_markup())
         # Очищаем состояние
         await state.clear()
@@ -485,10 +435,9 @@ async def process_new_percent_signal_text(message: types.Message, state: FSMCont
 @dp.callback_query(lambda c: c.data.startswith('reset_percent_signal_'))
 async def process_reset_percent_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[3]
-    query = "SELECT percent_signal FROM percent_signals WHERE asset_name=%s"
-    value_signal = await get_entry_point(asset_name, query)
+    current_percent_signal = await PercentSignalRepository.get_percent_signal_by_asset_name(asset_name)
     previous_keyboard = previous_handler
-    if value_signal is not None:
+    if current_percent_signal is not None:
         # Создаем клавиатуру с кнопками "Да" и "Нет"
         confirm_keyboard = InlineKeyboardBuilder()
         confirm_keyboard.add(
@@ -508,11 +457,9 @@ async def process_reset_percent_signal(callback_query: types.CallbackQuery):
 async def process_confirm_reset_percent_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[4]
     previous_keyboard = previous_handler
-    # Выполняем сброс точки входа
-    query = "DELETE FROM percent_signals WHERE asset_name = %s"
-    reset = await reset_entry_point(asset_name, query)
+    reset = await PercentSignalRepository.delete_percent_signal(asset_name)
     if reset:
-        # Отправляем сообщение об успешном сбросе точки входа
+        # Отправляем сообщение об успешном сбросе сигнала
         mess = f"Сигнал по процентам для актива {asset_name} успешно сброшена."
         await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
     else:

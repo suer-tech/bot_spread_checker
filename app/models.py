@@ -3,6 +3,28 @@ from django.db import models
 
 class Instrument(models.Model):
     name = models.CharField(max_length=100)
-    base = models.DecimalField(max_digits=10, decimal_places=10)
-    future = models.DecimalField(max_digits=10, decimal_places=10)
+    base = models.FloatField()
+    future = models.FloatField()
 
+
+class Base(models.Model):
+    asset_name = models.CharField(max_length=100)
+
+    class Meta:
+        abstract = True
+
+
+class Spread(Base):
+    spread = models.FloatField()
+
+
+class EntriesPoint(Base):
+    entry_point = models.FloatField()
+
+
+class PercentSignal(Base):
+    percent_signal = models.FloatField()
+
+
+class ValueSignal(Base):
+    value_signal = models.FloatField()

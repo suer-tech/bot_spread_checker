@@ -35,5 +35,6 @@ def subscribe_price(asset):
 
                 # Преобразование в число с учетом nano
                 numeric_value = float(f"{last_price_units}.{last_price_nano}")
+                print(numeric_value)
                 return numeric_value
 

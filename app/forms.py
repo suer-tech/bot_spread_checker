@@ -1,3 +1,5 @@
+import asyncio
+
 from asgiref.sync import sync_to_async
 from django import forms
 from django.contrib.admin.widgets import AdminTextInputWidget
@@ -26,8 +28,8 @@ class InstrumentForm(forms.ModelForm):
         instrument = super().save(commit=False)
 
         # Получение цены базового актива и фьючерса из введенных пользователем данных
-        base_price = get_base_price(self.cleaned_data['base'])
-        future_price = get_future_price(self.cleaned_data['future'])
+        base_price = asyncio.run(get_base_price(self.cleaned_data['base']))
+        future_price = asyncio.run(get_future_price(self.cleaned_data['future']))
 
         # Сохранение цен в базу данных
         instrument.name = self.cleaned_data['name']
@@ -35,7 +37,7 @@ class InstrumentForm(forms.ModelForm):
         instrument.future = future_price
 
         spread = calculate_spread(instrument)
-        SpreadRepository.add_spread(instrument.name, spread)
+        asyncio.run(SpreadRepository.add_spread(instrument.name, spread))
 
         if commit:
             instrument.save()

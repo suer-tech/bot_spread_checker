@@ -19,7 +19,7 @@ class SpreadRepository:
     @staticmethod
     @sync_to_async
     def get_all_spreads():
-        return list(Spread.objects.all())
+        return [spread.value for spread in Spread.objects.all()]
 
     @staticmethod
     @sync_to_async

@@ -19,7 +19,7 @@ class InstrumentRepository:
     @staticmethod
     @sync_to_async
     def get_all_instruments():
-        return Instrument.objects.all()
+        return [inst.name for inst in Instrument.objects.all()]
 
     @staticmethod
     @sync_to_async

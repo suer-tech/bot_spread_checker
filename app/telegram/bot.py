@@ -8,6 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from asgiref.sync import sync_to_async
 
 from app.services.repositories.entry_point_repositories import EntriesPointRepository
+from app.services.repositories.instrument_repositories import InstrumentRepository
 from app.services.repositories.percent_signal_repositories import PercentSignalRepository
 from app.services.repositories.spread_repositories import SpreadRepository
 from app.services.repositories.value_signal_repositories import ValueSignalRepository
@@ -47,13 +48,14 @@ async def check_rpm(message: types.Message):
 # Обработчик нажатия кнопки "Актив"
 @dp.callback_query(lambda c: c.data == 'spreads')
 async def process_assets(callback_query: types.CallbackQuery):
-    assets = await SpreadRepository.get_all_spreads()
+    assets = await InstrumentRepository.get_all_instruments()
+    print(assets)
     if len(assets) == 0:
         mess = "Сохраненные активы отсутствуют"
     else:
         mess = "Выберите актив:"
     # Добавление кнопок для каждого актива
-    buttons = [(row[0], "asset_" + row[0]) for row in assets]
+    buttons = [(row, "asset_" + row) for row in assets]
     # Создаем клавиатуру с активами
     keyboard = await keyboard_factory.create(buttons)
     # Отправляем сообщение с клавиатурой активов и ожидаем ответа
@@ -76,10 +78,11 @@ async def process_asset(callback_query: types.CallbackQuery):
 # Обработчик нажатия кнопки "Спред"
 @dp.callback_query(lambda c: c.data.startswith('spread_'))
 async def process_spread(callback_query: types.CallbackQuery):
+    print(callback_query.data)
     asset_name = callback_query.data.split('_')[1]
     spread_data = await SpreadRepository.get_spread_by_asset_name(asset_name)
     previous_keyboard = previous_handler
-    mess = "Спред для {}: {}".format(asset_name, spread_data[0])
+    mess = "Спред для {}: {}".format(asset_name, spread_data)
     await callback_query.message.answer(mess, reply_markup=previous_keyboard.as_markup())
 
 

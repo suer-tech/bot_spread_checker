@@ -12,7 +12,7 @@ from .api_config import tinkoff_token
 TOKEN = tinkoff_token
 
 
-def subscribe_price(asset):
+async def subscribe_price(asset):
     print(asset)
     with Client(TOKEN) as client:
         market_data_stream: MarketDataStreamManager = client.create_market_data_stream()

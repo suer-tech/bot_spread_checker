@@ -1,3 +1,5 @@
+import asyncio
+
 from tinkoff.invest import (
     Client
 )
@@ -5,7 +7,7 @@ from tinkoff.invest import (
 from app.api.api_config import tinkoff_token
 
 
-def find_share(isin):
+async def find_share(isin):
     with Client(tinkoff_token) as client:
         inst = client.instruments.find_instrument(query=isin)
         for cur in inst.instruments:
@@ -16,7 +18,7 @@ def find_share(isin):
                 return cur
 
 
-def find_future(ticker):
+async def find_future(ticker):
     with Client(tinkoff_token) as client:
         inst = client.instruments.find_instrument(query=ticker)
         for cur in inst.instruments:
@@ -25,4 +27,5 @@ def find_future(ticker):
                 print(f'find_future: {cur}')
                 print('')
                 return cur
+
 

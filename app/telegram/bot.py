@@ -1,26 +1,30 @@
 import asyncio
+import logging
+
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardButton
+from aiogram.fsm.state import State, StatesGroup, default_state
+from aiogram import Bot, Dispatcher, F, Router, html
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import InlineKeyboardButton, Message, ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton
 import psycopg2
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from asgiref.sync import sync_to_async
-
+from aiogram.filters import Command
 from app.services.repositories.entry_point_repositories import EntriesPointRepository
 from app.services.repositories.instrument_repositories import InstrumentRepository
 from app.services.repositories.percent_signal_repositories import PercentSignalRepository
 from app.services.repositories.spread_repositories import SpreadRepository
 from app.services.repositories.value_signal_repositories import ValueSignalRepository
 from app.telegram.db import db
-from app.telegram.keyboard.buttons import Button, main
+from app.telegram.keyboard.buttons import Button, main_butts, entry_point
 from app.telegram.keyboard.keyboard import keyboard_factory
 from app.telegram.states import TextSave
 
-
 # Создание экземпляров бота и диспетчера
-bot = Bot(token="6673857772:AAH4ZFcC9PFGSPs7o447QP_UQJNUiLjaVLw")
-dp = Dispatcher()
+
+router = Router()
 previous_handler = None
 
 
@@ -28,42 +32,41 @@ previous_handler = None
 #                                  Основные обработчики
 # ---------------------------------------------------------------------------------------------------------------------
 # Обработчик команды /start
-@dp.message(CommandStart())
-async def start(message: types.Message):
+@router.message(CommandStart())
+async def command_start(message: types.Message):
     static_buttons = await Button().static()
     static_keyboard = await keyboard_factory.generate_static_keyboard(static_buttons)
     await message.answer("Привет", reply_markup=static_keyboard.as_markup(resize_keyboard=True))
 
 
-@dp.message()
+@router.message()
 async def check_rpm(message: types.Message):
     global previous_handler
     if message.text == 'Главное меню':
-        main_buttons = await main()
+        main_buttons = await main_butts()
         keyboard = await keyboard_factory.generate_main_keyboard(main_buttons)
         previous_handler = keyboard
         await message.answer("Выберите опцию:", reply_markup=keyboard.as_markup())
 
 
-# Обработчик нажатия кнопки "Актив"
-@dp.callback_query(lambda c: c.data == 'spreads')
-async def process_assets(callback_query: types.CallbackQuery):
-    assets = await InstrumentRepository.get_all_instruments()
-    print(assets)
-    if len(assets) == 0:
-        mess = "Сохраненные активы отсутствуют"
-    else:
-        mess = "Выберите актив:"
-    # Добавление кнопок для каждого актива
-    buttons = [(row, "asset_" + row) for row in assets]
-    # Создаем клавиатуру с активами
-    keyboard = await keyboard_factory.create(buttons)
-    # Отправляем сообщение с клавиатурой активов и ожидаем ответа
-    await callback_query.message.edit_text(mess, reply_markup=keyboard.as_markup())
+# # Обработчик нажатия кнопки "Актив"
+# @router.callback_query(lambda c: c.data == 'spreads')
+# async def process_assets(callback_query: types.CallbackQuery):
+#     assets = await InstrumentRepository.get_all_instruments()
+#     if len(assets) == 0:
+#         mess = "Сохраненные активы отсутствуют"
+#     else:
+#         mess = "Выберите актив:"
+#     # Добавление кнопок для каждого актива
+#     buttons = [(row, "asset_" + row) for row in assets]
+#     # Создаем клавиатуру с активами
+#     keyboard = await keyboard_factory.create(buttons)
+#     # Отправляем сообщение с клавиатурой активов и ожидаем ответа
+#     await callback_query.message.edit_text(mess, reply_markup=keyboard.as_markup())
 
 
 # Обработчик нажатия кнопки актива
-@dp.callback_query(lambda c: c.data.startswith('asset_'))
+@router.callback_query(lambda c: c.data.startswith('asset_'))
 async def process_asset(callback_query: types.CallbackQuery):
     global previous_handler
     asset_name = callback_query.data.split('_')[1]
@@ -76,7 +79,7 @@ async def process_asset(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Спред"
-@dp.callback_query(lambda c: c.data.startswith('spread_'))
+@router.callback_query(lambda c: c.data.startswith('spread_'))
 async def process_spread(callback_query: types.CallbackQuery):
     print(callback_query.data)
     asset_name = callback_query.data.split('_')[1]
@@ -87,7 +90,7 @@ async def process_spread(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Спреды"
-@dp.callback_query(lambda c: c.data == 'show_spreads')
+@router.callback_query(lambda c: c.data == 'show_spreads')
 async def process_show_spreads(callback_query: types.CallbackQuery):
     assets = await SpreadRepository.get_all_spreads()
     if assets:
@@ -100,20 +103,22 @@ async def process_show_spreads(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Точки входа"
-@dp.callback_query(lambda c: c.data == 'entry_points')
+@router.callback_query(lambda c: c.data == 'entry_points')
 async def process_show_entry_points(callback_query: types.CallbackQuery):
     assets = await EntriesPointRepository.get_all_entries_points()
     if assets:
         mess = '\n'.join([f'{row[0]}: {row[1]}' for row in assets])
+        buttons = await entry_point()
+        keyboard = await keyboard_factory.create(buttons, back_data="spreads")
     else:
         mess = "Точки входа отсутствуют"
-    previous_keyboard = previous_handler
+        keyboard = previous_handler
     # Отправляем сообщение с клавиатурой активов и ожидаем ответа
-    await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
+    await callback_query.message.edit_text(mess, reply_markup=keyboard.as_markup())
 
 
 # Обработчик нажатия кнопки "Сигналы по значению"
-@dp.callback_query(lambda c: c.data == 'value_signals')
+@router.callback_query(lambda c: c.data == 'value_signals')
 async def process_show_value_signals(callback_query: types.CallbackQuery):
     assets = await ValueSignalRepository.get_all_value_signals()
     if assets:
@@ -126,7 +131,7 @@ async def process_show_value_signals(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Сигналы по процентам"
-@dp.callback_query(lambda c: c.data == 'percent_signals')
+@router.callback_query(lambda c: c.data == 'percent_signals')
 async def process_show_percent_signals(callback_query: types.CallbackQuery):
     assets = await PercentSignalRepository.get_all_percent_signals()
     if assets:
@@ -143,20 +148,8 @@ async def process_show_percent_signals(callback_query: types.CallbackQuery):
 # ---------------------------------------------------------------------------------------------------------------------
 
 
-# Обработчик нажатия кнопки "Точка входа"
-@dp.callback_query(lambda c: c.data.startswith('entry_point_'))
-async def process_entry_point(callback_query: types.CallbackQuery):
-    global previous_handler
-    asset_name = callback_query.data.split('_')[2]
-    buttons = await Button(asset_name).entry_point()
-    keyboard = await keyboard_factory.create(buttons, back_data="spreads")
-    previous_handler = keyboard
-    await callback_query.message.edit_text("Выберите действие для точки входа актива {}: ".format(asset_name),
-                                           reply_markup=keyboard.as_markup())
-
-
 # Обработчик нажатия кнопки "Текущая ТВХ"
-@dp.callback_query(lambda c: c.data.startswith('current_entry_'))
+@router.callback_query(lambda c: c.data.startswith('current_entry_'))
 async def process_current_entry(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[2]
     entry_point = await EntriesPointRepository.get_entries_point_by_asset_name(asset_name)
@@ -169,45 +162,87 @@ async def process_current_entry(callback_query: types.CallbackQuery):
                                                reply_markup=previous_keyboard.as_markup())
 
 
-# Обработчик нажатия кнопки "Новая ТВХ"
-@dp.callback_query(lambda c: c.data.startswith('new_entry_'))
-async def process_new_entry(callback_query: types.CallbackQuery, state: FSMContext):
-    previous_keyboard = previous_handler
-    asset_name = callback_query.data.split('_')[2]
-    entry_point = await EntriesPointRepository.get_entries_point_by_asset_name(asset_name)
-    if entry_point is not None:
-        mess = f"Для актива {asset_name} уже существует точка входа."
-        await callback_query.message.edit_text(mess, reply_markup=previous_keyboard.as_markup())
-        return
-    await callback_query.message.edit_text(f"Введите новую ТВХ для актива {asset_name}: ")
-    # Устанавливаем состояние ожидания новой ТВХ
-    await state.set_state(TextSave.waiting_for_entry)
-    # Сохраняем информацию о текущем активе
-    await state.update_data(asset_name=asset_name)
+
+class Form(StatesGroup):
+    entry_point = State()
+    asset_name = State()
 
 
-@dp.message(TextSave.waiting_for_entry)
-async def process_new_entry_text(message: types.Message, state: FSMContext):
-    previous_keyboard = previous_handler
-    try:
-        # Получаем введенное значение
-        new_entry = float(message.text)
-        # Получаем информацию о текущем активе из состояния
-        data = await state.get_data()
-        asset_name = data.get('asset_name')
-        # Сохраняем новую ТВХ в базу данных
-        query = EntriesPointRepository.add_entries_point(asset_name, new_entry)
-        # Выводим сообщение об успешном сохранении новой точки входа
-        mess = f"Новая ТВХ для актива {asset_name} успешно сохранена: {new_entry}"
-        await message.answer(mess, reply_markup=previous_keyboard.as_markup())
-        # Очищаем состояние
-        await state.clear()
-    except ValueError:
-        await message.answer("Введено некорректное значение. Введите числовое значение.")
+@router.message(F.text.casefold() == "Новая ТВХ")
+# @router.callback_query(lambda c: c.data.startswith('new_entry_'))
+async def commandss(message: Message, state: FSMContext) -> None:
+    await state.set_state(Form.entry_point)
+    await message.answer(
+        "Hi there! What's your name?",
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
+
+@router.message(Form.entry_point)
+async def process_name(message: Message, state: FSMContext) -> None:
+    await state.update_data(name=message.text)
+    await state.set_state(Form.like_bots)
+    await message.answer(
+        f"Nice to meet you, {html.quote(message.text)}!\nDid you like to write bots?",
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard=[
+                [
+                    KeyboardButton(text="Yes"),
+                    KeyboardButton(text="No"),
+                ]
+            ],
+            resize_keyboard=True,
+        ),
+    )
+
+#
+#
+# # Обработчик нажатия кнопки "Новая ТВХ"
+# @router.message(CommandStart())
+# async def process_new_entry(message: Message, state: FSMContext):
+#     # print('Новая ТВХ')
+#     #
+#     # keyboard = await keyboard_factory.back(back_data="entry_points")
+#     # asset_name = callback_query.data.split('_')[2]
+#     # entry_point = await EntriesPointRepository.get_entries_point_by_asset_name(asset_name)
+#     # if entry_point is not None:
+#     #     mess = f"Для актива {asset_name} уже существует точка входа."
+#     #     await callback_query.message.edit_text(mess, reply_markup=keyboard.as_markup())
+#     # else:
+#     await state.set_state(Form.entry_point)
+#     await message.answer(f"Введите новую ТВХ для актива {'asset_name'}: ")
+#
+#
+# @router.message(Form.entry_point)
+# async def process_surname(message: types.Message, state: FSMContext):
+#     print("cdsffjkkjg")
+#     await state.update_data(entry_point=message.text)
+#     await state.set_state(Form.asset_name)
+
+
+
+# @router.message(Form.entry_point)
+# async def process_new_entry_text(message: types.Message, state: FSMContext):
+#     print('process_new_entry_text')
+#     previous_keyboard = previous_handler
+#     try:
+#         # Получаем введенное значение
+#         new_entry = float(message.text)
+#         # Получаем информацию о текущем активе из состояния
+#         data = await state.get_data()
+#         asset_name = data.get('asset_name')
+#         # Сохраняем новую ТВХ в базу данных
+#         query = EntriesPointRepository.add_entries_point(asset_name, new_entry)
+#         # Выводим сообщение об успешном сохранении новой точки входа
+#         mess = f"Новая ТВХ для актива {asset_name} успешно сохранена: {new_entry}"
+#         await message.answer(mess, reply_markup=previous_keyboard.as_markup())
+#         # Очищаем состояние
+#         await state.clear()
+#     except ValueError:
+#         await message.answer("Введено некорректное значение. Введите числовое значение.")
 
 # Обработчик нажатия кнопки "Сбросить ТВХ"
-@dp.callback_query(lambda c: c.data.startswith('reset_entry_'))
+@router.callback_query(lambda c: c.data.startswith('reset_entry_'))
 async def process_reset_entry(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[2]
     entry_point = await EntriesPointRepository.get_entries_point_by_asset_name(asset_name)
@@ -227,7 +262,7 @@ async def process_reset_entry(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Да" для подтверждения сброса точки входа
-@dp.callback_query(lambda c: c.data.startswith('confirm_reset_'))
+@router.callback_query(lambda c: c.data.startswith('confirm_reset_'))
 async def process_confirm_reset(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[2]
     previous_keyboard = previous_handler
@@ -243,7 +278,7 @@ async def process_confirm_reset(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Нет" для отмены сброса точки входа
-@dp.callback_query(lambda c: c.data.startswith('cancelreset_'))
+@router.callback_query(lambda c: c.data.startswith('cancelreset_'))
 async def process_cancel_reset(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[1]
     print(callback_query.data)
@@ -255,7 +290,7 @@ async def process_cancel_reset(callback_query: types.CallbackQuery):
 #                                  Обработчики 'Сигналы'
 # ---------------------------------------------------------------------------------------------------------------------
 # Обработчик нажатия кнопки "Сигналы"
-@dp.callback_query(lambda c: c.data.startswith('signals_'))
+@router.callback_query(lambda c: c.data.startswith('signals_'))
 async def process_signals(callback_query: types.CallbackQuery):
     global previous_handler
 
@@ -268,7 +303,7 @@ async def process_signals(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Сигнал по значению"
-@dp.callback_query(lambda c: c.data.startswith('valuesignals_'))
+@router.callback_query(lambda c: c.data.startswith('valuesignals_'))
 async def process_value_signals(callback_query: types.CallbackQuery):
     global previous_handler
     asset_name = callback_query.data.split('_')[1]
@@ -280,7 +315,7 @@ async def process_value_signals(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Текущий сигнал по значению"
-@dp.callback_query(lambda c: c.data.startswith('current_value_signal_'))
+@router.callback_query(lambda c: c.data.startswith('current_value_signal_'))
 async def process_current_value_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[3]
     current_value_signal = await ValueSignalRepository.get_value_signal_by_asset_name(asset_name)
@@ -294,7 +329,7 @@ async def process_current_value_signal(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Новый сигнал по значению"
-@dp.callback_query(lambda c: c.data.startswith('new_value_signal_'))
+@router.callback_query(lambda c: c.data.startswith('new_value_signal_'))
 async def process_new_value_signal(callback_query: types.CallbackQuery, state: FSMContext):
     previous_keyboard = previous_handler
     asset_name = callback_query.data.split('_')[3]
@@ -310,7 +345,7 @@ async def process_new_value_signal(callback_query: types.CallbackQuery, state: F
     await state.update_data(asset_name=asset_name)
 
 
-@dp.message(TextSave.waiting_for_value_signal)
+@router.message(TextSave.waiting_for_value_signal)
 async def process_new_value_signal_text(message: types.Message, state: FSMContext):
     previous_keyboard = previous_handler
     try:
@@ -327,7 +362,7 @@ async def process_new_value_signal_text(message: types.Message, state: FSMContex
 
 
 # Обработчик нажатия кнопки "Сбросить сигнал по значению"
-@dp.callback_query(lambda c: c.data.startswith('reset_value_signal_'))
+@router.callback_query(lambda c: c.data.startswith('reset_value_signal_'))
 async def process_reset_value_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[3]
     current_value_signal = await ValueSignalRepository.get_value_signal_by_asset_name(asset_name)
@@ -347,7 +382,7 @@ async def process_reset_value_signal(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Да" для подтверждения сброса  сигнала по значению
-@dp.callback_query(lambda c: c.data.startswith('confirm_value_signal_reset_'))
+@router.callback_query(lambda c: c.data.startswith('confirm_value_signal_reset_'))
 async def process_confirm_reset_value_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[4]
     previous_keyboard = previous_handler
@@ -362,7 +397,7 @@ async def process_confirm_reset_value_signal(callback_query: types.CallbackQuery
 
 
 # Обработчик нажатия кнопки "Нет" для отмены сброса  сигнала по значению
-@dp.callback_query(lambda c: c.data.startswith('cancelresetvaluesignal_'))
+@router.callback_query(lambda c: c.data.startswith('cancelresetvaluesignal_'))
 async def process_cancel_reset_value_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[1]
     # Возвращаемся к выбору опций для актива
@@ -373,7 +408,7 @@ async def process_cancel_reset_value_signal(callback_query: types.CallbackQuery)
 #                                  Обработчики 'Сигналы по процентам'
 # ---------------------------------------------------------------------------------------------------------------------
 # Обработчик нажатия кнопки "Сигнал по значению"
-@dp.callback_query(lambda c: c.data.startswith('percentsignals_'))
+@router.callback_query(lambda c: c.data.startswith('percentsignals_'))
 async def process_percent_signals(callback_query: types.CallbackQuery):
     global previous_handler
 
@@ -386,7 +421,7 @@ async def process_percent_signals(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Сигнал по процентам"
-@dp.callback_query(lambda c: c.data.startswith('current_percent_signal_'))
+@router.callback_query(lambda c: c.data.startswith('current_percent_signal_'))
 async def process_current_percent_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[3]
     current_percent_signal = await PercentSignalRepository.get_percent_signal_by_asset_name(asset_name)
@@ -400,7 +435,7 @@ async def process_current_percent_signal(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Новый сигнал по значению"
-@dp.callback_query(lambda c: c.data.startswith('new_percent_signal_'))
+@router.callback_query(lambda c: c.data.startswith('new_percent_signal_'))
 async def process_new_percent_signal_(callback_query: types.CallbackQuery, state: FSMContext):
     previous_keyboard = previous_handler
     asset_name = callback_query.data.split('_')[3]
@@ -416,7 +451,7 @@ async def process_new_percent_signal_(callback_query: types.CallbackQuery, state
     await state.update_data(asset_name=asset_name)
 
 
-@dp.message(TextSave.waiting_for_value_signal)
+@router.message(TextSave.waiting_for_value_signal)
 async def process_new_percent_signal_text(message: types.Message, state: FSMContext):
     previous_keyboard = previous_handler
     try:
@@ -435,7 +470,7 @@ async def process_new_percent_signal_text(message: types.Message, state: FSMCont
 
 
 # Обработчик нажатия кнопки "Сбросить сигнал по процентам"
-@dp.callback_query(lambda c: c.data.startswith('reset_percent_signal_'))
+@router.callback_query(lambda c: c.data.startswith('reset_percent_signal_'))
 async def process_reset_percent_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[3]
     current_percent_signal = await PercentSignalRepository.get_percent_signal_by_asset_name(asset_name)
@@ -456,7 +491,7 @@ async def process_reset_percent_signal(callback_query: types.CallbackQuery):
 
 
 # Обработчик нажатия кнопки "Да" для подтверждения сброса  сигнала по процентам
-@dp.callback_query(lambda c: c.data.startswith('confirm_percent_signal_reset_'))
+@router.callback_query(lambda c: c.data.startswith('confirm_percent_signal_reset_'))
 async def process_confirm_reset_percent_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[4]
     previous_keyboard = previous_handler
@@ -471,11 +506,19 @@ async def process_confirm_reset_percent_signal(callback_query: types.CallbackQue
 
 
 # Обработчик нажатия кнопки "Нет" для отмены сброса  сигнала по процентам
-@dp.callback_query(lambda c: c.data.startswith('cancepercentlreset_'))
+@router.callback_query(lambda c: c.data.startswith('cancepercentlreset_'))
 async def process_cancel_reset_percent_signal(callback_query: types.CallbackQuery):
     asset_name = callback_query.data.split('_')[1]
     # Возвращаемся к выбору опций для актива
     await process_asset(callback_query)
 
 
-start_bot = asyncio.run(dp.start_polling(bot))
+async def main():
+    bot = Bot(token="6673857772:AAH4ZFcC9PFGSPs7o447QP_UQJNUiLjaVLw")
+
+    dp = Dispatcher()
+    dp.include_router(router)
+    await dp.start_polling(bot)
+
+
+start_bot = asyncio.run(main())

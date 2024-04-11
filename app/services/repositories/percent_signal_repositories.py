@@ -18,7 +18,7 @@ class PercentSignalRepository:
     @staticmethod
     @sync_to_async
     def get_all_percent_signals():
-        return PercentSignal.objects.all()
+        return [(inst.asset_name, inst.percent_signal) for inst in PercentSignal.objects.all()]
 
     @staticmethod
     @sync_to_async

@@ -1,12 +1,15 @@
-async def main():
+async def main_butts():
     return [
-        ("Активы", "spreads"),
         ("Спреды", "show_spreads"),
         ("Точки входа", "entry_points"),
         ("Сигналы по значению", "value_signals"),
         ("Сигналы по процентам", "percent_signals")
     ]
 
+
+async def entry_point():
+    return [("Новая ТВХ", "new_entry_"),
+           ("Сбросить ТВХ", "reset_entry_")]
 
 class Button:
     def __init__(self, asset_name=None):
@@ -22,10 +25,6 @@ class Button:
                 ("Точка входа", "entry_point_" + self.asset_name),
                 ("Сигналы", "signals_" + self.asset_name)]
 
-    async def entry_point(self):
-        return [("Текущая ТВХ", "current_entry_" + self.asset_name),
-               ("Новая ТВХ", "new_entry_" + self.asset_name),
-               ("Сбросить ТВХ", "reset_entry_" + self.asset_name)]
 
     async def signals(self):
         return [("Сигнал по значению", "valuesignals_" + self.asset_name),

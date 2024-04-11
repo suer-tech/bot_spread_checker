@@ -16,6 +16,14 @@ class KeyboardFactory:
         return keyboard
 
     @staticmethod
+    async def back(back_data=None):
+        keyboard = InlineKeyboardBuilder()
+        if back_data:
+            keyboard.add(InlineKeyboardButton(text="<<Назад", callback_data=back_data))
+        keyboard.adjust(1)
+        return keyboard
+
+    @staticmethod
     async def generate_main_keyboard(buttons):
         keyboard = InlineKeyboardBuilder()
         for text, callback_data in buttons:

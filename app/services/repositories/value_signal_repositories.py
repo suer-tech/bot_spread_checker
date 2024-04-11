@@ -18,7 +18,7 @@ class ValueSignalRepository:
     @staticmethod
     @sync_to_async
     def get_all_value_signals():
-        return ValueSignal.objects.all()
+        return [(inst.asset_name, inst.value_signal) for inst in ValueSignal.objects.all()]
 
     @staticmethod
     @sync_to_async

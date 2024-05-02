@@ -1,5 +1,6 @@
 import asyncio
 
+from django.contrib import admin
 from asgiref.sync import sync_to_async
 from django import forms
 from django.contrib.admin.widgets import AdminTextInputWidget
@@ -16,7 +17,7 @@ class PriceInputWidget(AdminTextInputWidget):
 
 
 class InstrumentForm(forms.ModelForm):
-    base = forms.CharField(label='Base', widget=PriceInputWidget)
+    base = forms.CharField(label='Base ISIN code', widget=PriceInputWidget)
     future = forms.CharField(label='Future', widget=PriceInputWidget)
 
     class Meta:
@@ -42,3 +43,6 @@ class InstrumentForm(forms.ModelForm):
         if commit:
             instrument.save()
         return instrument
+
+
+

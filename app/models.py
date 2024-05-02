@@ -6,6 +6,9 @@ class Instrument(models.Model):
     base = models.FloatField()
     future = models.FloatField()
 
+    def __str__(self):
+        return self.name
+
 
 class Base(models.Model):
     asset_name = models.CharField(max_length=100)
